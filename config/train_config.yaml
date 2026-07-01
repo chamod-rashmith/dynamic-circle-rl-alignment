@@ -1,0 +1,14 @@
+supervised:
+  epochs: 150
+  lr: 0.02
+  batch_size: 128
+  patience: 25
+  n_samples: 6000
+  model_save_path: "output/dynamic_radius_model.pth"
+
+rl:
+  epochs: 1000
+  lr: 0.001
+  batch_size: 32
+  model_path: "output/dynamic_radius_model.pth"
+  rl_model_save_path: "output/rl_finetuned_model.pth"

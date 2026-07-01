@@ -1,0 +1,17 @@
+[project]
+name = "dynamic-circle-rl-alignment"
+version = "0.1.0"
+description = "Dynamic 2D circle classifier trained with supervised learning and aligned via Reinforcement Learning (REINFORCE) with XAI diagnostics."
+
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "opencv-python>=4.13.0.92",
+    "torch>=2.12.1",
+    "torchvision>=0.27.1",
+    "ultralytics>=8.4.82",
+    "mediapipe==0.10.14",
+    "pygame>=2.6.1",
+]
+
+
