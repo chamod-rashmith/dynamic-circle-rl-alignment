@@ -46,7 +46,7 @@ The project follows a hybrid paradigm similar to modern AI alignment pipelines:
 graph TD
     A[Generate Synthetic Data: x, y, r] --> B[Supervised Pre-training SFT]
     B --> C[Checkpoints: output/dynamic_radius_model.pth]
-    C --> D[RL Environment: States & Actions]
+    C --> D[Gymnasium Env: CircleEnv]
     D --> E[REINFORCE Policy Gradient Alignment]
     E --> F[Checkpoints: output/rl_finetuned_model.pth]
     F --> G[XAI & Weight Diagnostics]
