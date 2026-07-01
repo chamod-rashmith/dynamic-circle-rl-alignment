@@ -52,7 +52,7 @@ graph TD
 ```
 
 ### 1. Supervised Fine-Tuning (SFT)
-* **Dataset Generation**: We generate $60,000$ points where coordinates $x_1, x_2$ are sampled uniformly from $[-3.0, 3.0]$ and the radius $r$ is sampled from $[0.3, 3.0]$.
+* **Dataset Generation**: We generate $6,000$ points where coordinates $x_1, x_2$ are sampled uniformly from $[-3.0, 3.0]$ and the radius $r$ is sampled from $[0.3, 3.0]$.
 * **Optimization**: Binary Cross Entropy Loss (BCELoss) combined with the Adam optimizer ($lr=0.02$).
 * **Overfitting Prevention**: Custom **Early Stopping** tracks validation loss. If it fails to improve for `patience=25` epochs, training is halted, and the best model weights are restored.
 * **Result**: Achieves **~98.5% Accuracy** on unseen validation datasets.
@@ -63,10 +63,15 @@ Instead of relying on supervised gradients, we treat the pre-trained classifier 
 * **Action Space ($\mathcal{A}$)**: Binary prediction $a \in \{0, 1\}$ (0 for OUTSIDE, 1 for INSIDE).
 * **Policy ($\pi_\theta$)**: The model's Sigmoid output probability $p$ forms a Bernoulli distribution.
 * **Reward Function ($\mathcal{R}$)**:
-  $$\mathcal{R}(\mathbf{s}, a) = \begin{cases} +1.0 & \text{if prediction } a \text{ is correct} \\ -1.5 & \text{if prediction } a \text{ is incorrect (penalty)} \end{cases}$$
+
+$$\mathcal{R}(\mathbf{s}, a) = \begin{cases} +1.0 & \text{if prediction } a \text{ is correct} \\ -1.5 & \text{if prediction } a \text{ is incorrect (penalty)} \end{cases}$$
+
 * **REINFORCE Algorithm**: We update the policy parameters using the policy gradient loss:
-  $$\mathcal{L}_{PG}(\theta) = -\log \pi_\theta(a|\mathbf{s}) \times \mathcal{R}(\mathbf{s}, a)$$
+
+$$\mathcal{L}_{PG}(\theta) = -\log \pi_\theta(a|\mathbf{s}) \times \mathcal{R}(\mathbf{s}, a)$$
+
 * **Warm Start & LR Alignment**: Starting from SFT weights prevents the RL agent from starting from zero-knowledge. Lowering the learning rate to $lr=0.001$ protects the pre-trained weights from collapsing (**Catastrophic Forgetting**), resulting in a stable reward convergence of **+0.978+** (where 1.0 is perfect).
+
 
 ---
 
