@@ -134,30 +134,30 @@ Modify training hyperparameters inside [config/train_config.yaml](config/train_c
 ### 2. Run Supervised Learning
 Runs dataset generation, trains the baseline classifier with Early Stopping, and outputs boundaries:
 ```bash
-python main.py
+uv run python main.py
 ```
 
 ### 3. Run Reinforcement Learning Alignment
 Fine-tunes the supervised model in a dynamic reward environment over a larger range $[-15.0, 15.0]$:
 ```bash
-python rl/rl_finetune.py
+uv run python rl/rl_finetune.py
 ```
 
 ### 4. Interactive Point Testing
 Modify custom points `X_COORDINATE`, `Y_COORDINATE`, and `RADIUS` at the bottom of [evaluate/evaluate.py](evaluate/evaluate.py) and execute:
 ```bash
-python evaluate/evaluate.py
+uv run python evaluate/evaluate.py
 ```
 
 ### 5. Diagnostics & Interpretability
 Check weight statistics and parameter drift:
 ```bash
-python evaluate/plot_stats.py
-python evaluate/compare_weights.py
+uv run python evaluate/plot_stats.py
+uv run python evaluate/compare_weights.py
 ```
 Generate local and global XAI explanations:
 ```bash
-python evaluate/xai_explain.py
+uv run python evaluate/xai_explain.py
 ```
 
 ---
