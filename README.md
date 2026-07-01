@@ -1,119 +1,163 @@
-# Track_Me: 2D Dynamic Circle Classification & Reinforcement Learning Alignment
+# Dynamic 2D Circle Classifier: Supervised Pre-training (SFT) & Reinforcement Learning Alignment
 
-An end-to-end Deep Learning project demonstrating **Supervised Pre-training (SFT)**, **Reinforcement Learning (RL) Fine-Tuning (Alignment)**, and **Explainable AI (XAI)** to solve a dynamic geometric classification problem.
-
----
-
-## 📌 Project Overview
-
-This project trains a PyTorch Multi-Layer Perceptron (MLP) to determine whether a 2D point $(x, y)$ lies **inside** or **outside** a circle of dynamic radius $r$.
-
-The classification boundary follows the mathematical relationship:
-$$x^2 + y^2 \le r^2$$
-
-### Key Highlights
-1. **Dynamic Features**: Instead of classifying points inside a fixed boundary, the model accepts `[x, y, r]` as inputs, learning a parameterized decision boundary.
-2. **Hybrid Training**:
-   * **Supervised Learning**: Model is trained on coordinates in $[-3.0, 3.0]$ with Early Stopping, achieving **~98.5% Accuracy**.
-   * **Reinforcement Learning (REINFORCE)**: The pre-trained model is aligned using Policy Gradients (REINFORCE) over an expanded domain of $[-15.0, 15.0]$ with custom rewards.
-3. **Interpretability & Diagnostics (XAI)**:
-   * Feature attribution calculated using **Integrated Gradients (IG)**.
-   * Model statistics and weight drift visual comparisons (Supervised vs. RL).
+A high-performance, modular Deep Learning repository showcasing **Supervised Pre-training**, **Reinforcement Learning (RL) Fine-Tuning (Alignment)**, **Explainable AI (XAI)**, and **Neural Diagnostics** in PyTorch.
 
 ---
 
-## 🏗️ Model Architecture
+## 📖 Table of Contents
+- [Mathematical Formulation](#-mathematical-formulation)
+- [System Architecture & Training Pipeline](#-system-architecture--training-pipeline)
+  - [1. Supervised Fine-Tuning (SFT)](#1-supervised-fine-tuning-sft)
+  - [2. Reinforcement Learning (RL) Alignment](#2-reinforcement-learning-rl-alignment)
+- [Model Design & Capacity Optimization](#-model-design--capacity-optimization)
+- [Explainable AI (XAI) via Integrated Gradients](#-explainable-ai-xai-via-integrated-gradients)
+- [📂 Project Structure](#-project-structure)
+- [🚀 Execution Guide](#-execution-guide)
+- [📊 Visual Diagnostics & Plots](#-visual-diagnostics--plots)
 
-The [BaseModel](model/base_model.py) is a feedforward neural network built with PyTorch:
+---
 
-```python
-self.model = nn.Sequential(
-    nn.Linear(in_features=3, out_features=32),
-    nn.ReLU(),
-    nn.Linear(in_features=32, out_features=16),
-    nn.ReLU(),
-    nn.Linear(in_features=16, out_features=1),
-    nn.Sigmoid()
-)
+## 📐 Mathematical Formulation
+
+The core objective is to classify whether a random 2D point $\mathbf{x} = (x_1, x_2)$ lies inside or outside a circular boundary parameterized by a dynamic radius $r$. 
+
+$$\text{Target } y = \begin{cases} 1 & \text{if } \sqrt{x_1^2 + x_2^2} \le r \\ 0 & \text{otherwise} \end{cases}$$
+
+Unlike typical classification models that learn a *static* decision boundary (where $r$ is constant and hardcoded in the labels), this model accepts **both** the coordinate features and the radius feature as inputs:
+$$\mathbf{X} = [x_1, x_2, r]^T \in \mathbb{R}^3$$
+This forces the neural network to approximate the non-linear relationship between coordinates and the boundary radius.
+
+---
+
+## ⚙️ System Architecture & Training Pipeline
+
+The project follows a hybrid paradigm similar to modern AI alignment pipelines:
+
+```mermaid
+graph TD
+    A[Generate Synthetic Data: x, y, r] --> B[Supervised Pre-training SFT]
+    B --> C[Checkpoints: output/dynamic_radius_model.pth]
+    C --> D[RL Environment: States & Actions]
+    D --> E[REINFORCE Policy Gradient Alignment]
+    E --> F[Checkpoints: output/rl_finetuned_model.pth]
+    F --> G[XAI & Weight Diagnostics]
 ```
+
+### 1. Supervised Fine-Tuning (SFT)
+* **Dataset Generation**: We generate $60,000$ points where coordinates $x_1, x_2$ are sampled uniformly from $[-3.0, 3.0]$ and the radius $r$ is sampled from $[0.3, 3.0]$.
+* **Optimization**: Binary Cross Entropy Loss (BCELoss) combined with the Adam optimizer ($lr=0.02$).
+* **Overfitting Prevention**: Custom **Early Stopping** tracks validation loss. If it fails to improve for `patience=25` epochs, training is halted, and the best model weights are restored.
+* **Result**: Achieves **~98.5% Accuracy** on unseen validation datasets.
+
+### 2. Reinforcement Learning (RL) Alignment
+Instead of relying on supervised gradients, we treat the pre-trained classifier as a stochastic policy $\pi_\theta(a|\mathbf{s})$ and optimize it via policy gradients over an expanded domain of $[-15.0, 15.0]$.
+* **State Space ($\mathcal{S}$)**: $\mathbf{s} = [x_1, x_2, r] \in [-15.0, 15.0]^2 \times [0.5, 15.0]$
+* **Action Space ($\mathcal{A}$)**: Binary prediction $a \in \{0, 1\}$ (0 for OUTSIDE, 1 for INSIDE).
+* **Policy ($\pi_\theta$)**: The model's Sigmoid output probability $p$ forms a Bernoulli distribution.
+* **Reward Function ($\mathcal{R}$)**:
+  $$\mathcal{R}(\mathbf{s}, a) = \begin{cases} +1.0 & \text{if prediction } a \text{ is correct} \\ -1.5 & \text{if prediction } a \text{ is incorrect (penalty)} \end{cases}$$
+* **REINFORCE Algorithm**: We update the policy parameters using the policy gradient loss:
+  $$\mathcal{L}_{PG}(\theta) = -\log \pi_\theta(a|\mathbf{s}) \times \mathcal{R}(\mathbf{s}, a)$$
+* **Warm Start & LR Alignment**: Starting from SFT weights prevents the RL agent from starting from zero-knowledge. Lowering the learning rate to $lr=0.001$ protects the pre-trained weights from collapsing (**Catastrophic Forgetting**), resulting in a stable reward convergence of **+0.978+** (where 1.0 is perfect).
+
+---
+
+## 🧠 Model Design & Capacity Optimization
+
+* **Initial Capacity Issues**: A simple model with only 4 hidden neurons (`Linear(3, 4) -> ReLU() -> Linear(4, 1)`) underfitted the complex geometric space when expanded to $[-15.0, 15.0]$, failing to maintain boundary precision during RL.
+* **Final Architecture**: We expanded the capacity to 673 parameters using a deep MLP:
+  ```
+  Input Features (3) -> Linear(3, 32) -> ReLU() -> Linear(32, 16) -> ReLU() -> Linear(16, 1) -> Sigmoid()
+  ```
+  This higher capacity allows the network to generalize stably across vast coordinates and boundaries.
+
+---
+
+## 🔍 Explainable AI (XAI) via Integrated Gradients
+
+To verify that the model is making decisions based on mathematical relationships rather than correlation artifacts, we implement **Integrated Gradients (IG)**.
+
+Integrated Gradients computes the path integral of gradients along a straight line from a baseline (all-zero state $\mathbf{x}'$) to the input $\mathbf{x}$:
+
+$$\text{IG}_i(x) = (x_i - x'_i) \times \int_{0}^{1} \frac{\partial F(x' + \alpha(x - x'))}{\partial x_i} d\alpha$$
+
+### Attribution Results:
+For an input point $(0.4, 0.4)$ with radius $r=0.7$ (Distance $= 0.5657$):
+* **Input R (Radius)**: Positive attribution (**+3.5773**) $\implies$ Supports predicting **INSIDE** (as radius increases, the circle covers the point).
+* **Input X / Y**: Negative attributions (**-1.5806 / -1.2232**) $\implies$ Support predicting **OUTSIDE** (as coordinates increase, the point moves away from origin).
+
+This exactly mimics the mathematical gradient of the circle formula, verifying alignment!
 
 ---
 
 ## 📂 Project Structure
 
-```bash
-Track_Me/
-│
-├── model/
-│   └── base_model.py       # PyTorch MLP Model definition
-│
-├── evaluate/
-│   ├── evaluate.py         # Simple point evaluation script
-│   ├── plot_stats.py       # Weights/biases stats and distributions plotter
-│   ├── compare_weights.py  # Supervised vs. RL weight drift analyzer
-│   ├── xai_explain.py      # Integrated Gradients feature attribution
-│   └── plots/              # Saved visualizations
-│       ├── model_weight_stats.png
-│       ├── multi_radius_decision_boundary.png
-│       ├── rl_training_rewards.png
-│       ├── weight_comparison.png
-│       └── xai_explanation.png
-│
-├── rl/
-│   └── rl_finetune.py      # RL Fine-tuning using REINFORCE
-│
-├── output/
-│   ├── dynamic_radius_model.pth  # Supervised trained weights
-│   └── rl_finetuned_model.pth    # RL aligned weights
-│
-├── main.py                 # Supervised training orchestration script
-├── train.py                # Reusable supervised training loop (with Early Stopping)
-└── README.md               # Project documentation
-```
+* [model/base_model.py](model/base_model.py): Core neural network definition.
+* [config/train_config.yaml](config/train_config.yaml): Centralized configuration for supervised and RL parameters.
+* [train.py](train.py): Reusable supervised trainer containing Early Stopping.
+* [main.py](main.py): Pipeline script generating data, launching supervised training, and outputting decision boundary plots.
+* [rl/rl_finetune.py](rl/rl_finetune.py): RL training script using REINFORCE.
+* [evaluate/evaluate.py](evaluate/evaluate.py): Fast evaluation script for testing custom points.
+* [evaluate/plot_stats.py](evaluate/plot_stats.py): Distribution plotter for weights and biases.
+* [evaluate/compare_weights.py](evaluate/compare_weights.py): Metric-based weight drift comparator (Supervised vs. RL).
+* [evaluate/xai_explain.py](evaluate/xai_explain.py): Integrated Gradients calculation and plot.
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Execution Guide
 
-### 1. Installation
-Clone the repository and install the dependencies:
+Make sure dependencies are installed:
 ```bash
-pip install torch numpy matplotlib
+pip install torch numpy matplotlib pyyaml
 ```
 
-### 2. Run Supervised Training
-Train the model on the $[-3.0, 3.0]$ range. This saves the model to `output/` and generates decision boundary plots:
+### 1. Centralized Configuration
+Modify training hyperparameters inside [config/train_config.yaml](config/train_config.yaml).
+
+### 2. Run Supervised Learning
+Runs dataset generation, trains the baseline classifier with Early Stopping, and outputs boundaries:
 ```bash
 python main.py
 ```
 
-### 3. Run Reinforcement Learning Fine-tuning
-Align the pre-trained supervised model over a larger domain $[-15.0, 15.0]$ using custom rewards:
+### 3. Run Reinforcement Learning Alignment
+Fine-tunes the supervised model in a dynamic reward environment over a larger range $[-15.0, 15.0]$:
 ```bash
 python rl/rl_finetune.py
 ```
 
+### 4. Interactive Point Testing
+Modify custom points `X_COORDINATE`, `Y_COORDINATE`, and `RADIUS` at the bottom of [evaluate/evaluate.py](evaluate/evaluate.py) and execute:
+```bash
+python evaluate/evaluate.py
+```
 
-### 4. Explain Model Decisions (XAI)
-Run the Integrated Gradients feature attribution script to inspect how individual features (coordinates vs. radius) impact predictions:
+### 5. Diagnostics & Interpretability
+Check weight statistics and parameter drift:
+```bash
+python evaluate/plot_stats.py
+python evaluate/compare_weights.py
+```
+Generate local and global XAI explanations:
 ```bash
 python evaluate/xai_explain.py
 ```
 
 ---
 
-## 📊 Performance & Visualizations
+## 📊 Visual Diagnostics & Plots
 
-All generated plots are saved inside the [evaluate/plots/](evaluate/plots) directory:
+All generated visualizations are saved in the [evaluate/plots/](evaluate/plots) directory:
 
-### 1. Dynamic Decision Boundary
-Plots the decision boundary (green) against the true mathematical circle (dashed line) for multiple input radiuses ($r = 0.5, 1.5, 2.5$):
-* File: `evaluate/plots/multi_radius_decision_boundary.png`
+1. **`multi_radius_decision_boundary.png`**: Plots the learned boundary (green) against the true mathematical circle (dashed black line) for $r = 0.5, 1.5, 2.5$.
+2. **`rl_training_rewards.png`**: Displays the training reward curve showing fast, stable convergence due to supervised warm start.
+3. **`xai_explanation.png`**: Attribution bar chart proving local and global sensitivity parameters.
+4. **`weight_comparison.png`**: Histograms comparing the distribution shift of neural weights and biases between Supervised and RL training phases.
+5. **`model_weight_stats.png`**: Layer-by-layer parameter weight distribution.
 
-### 2. Reinforcement Learning Rewards
-Visualizes the training rewards over RL epochs. It starts at `+0.98` thanks to the supervised warm start, demonstrating stable convergence without catastrophic forgetting:
-* File: `evaluate/plots/rl_training_rewards.png`
+---
 
-### 3. Integrated Gradients Attribution
-Shows how the model assigns positive attribution to the Radius (supports INSIDE) and negative attribution to the coordinates (supports OUTSIDE):
-* File: `evaluate/plots/xai_explanation.png`
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
