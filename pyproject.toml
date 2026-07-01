@@ -12,6 +12,7 @@ dependencies = [
     "ultralytics>=8.4.82",
     "mediapipe==0.10.14",
     "pygame>=2.6.1",
+    "gymnasium>=0.29.1",
 ]
 
 

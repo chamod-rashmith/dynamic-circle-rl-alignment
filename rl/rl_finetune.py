@@ -10,6 +10,7 @@ from torch.distributions import Bernoulli
 # Add project root to path so we can import BaseModel
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from model.base_model import BaseModel
+from rl.circle_env import CircleEnv
 
 import yaml
 
@@ -47,23 +48,22 @@ def run_rl_finetuning():
     batch_size = config["batch_size"]
 
     
+    # Initialize Gymnasium environment
+    env = CircleEnv()
+    
     epochs = config["epochs"]
     for epoch in range(1, epochs + 1):
         model.train()
 
-        
         # We collect a batch of experiences
         batch_loss = 0.0
         epoch_rewards = []
         
         for _ in range(batch_size):
-            # 1. Generate state: [x, y, r] dynamically (expanded range)
-            x = np.random.uniform(-15.0, 15.0)
-            y = np.random.uniform(-15.0, 15.0)
-            r = np.random.uniform(0.5, 15.0)
-            state = torch.tensor([x, y, r], dtype=torch.float32)
+            # 1. Reset environment to get a new state/observation
+            obs, info = env.reset()
+            state = torch.tensor(obs, dtype=torch.float32)
 
-            
             # 2. Get policy probability (probability of predicting INSIDE)
             prob = model(state.unsqueeze(0)) # shape: [1, 1]
             
@@ -71,14 +71,9 @@ def run_rl_finetuning():
             dist = Bernoulli(prob)
             action = dist.sample() # 1.0 (INSIDE) or 0.0 (OUTSIDE)
             
-            # 4. Environment step: Calculate reward based on ground truth math
-            distance = np.sqrt(x**2 + y**2)
-            actual_label = 1.0 if distance <= r else 0.0
-            
-            if action.item() == actual_label:
-                reward = 1.0  # Safe/Correct prediction reward
-            else:
-                reward = -1.5 # Heavy penalty for incorrect prediction
+            # 4. Environment step: Pass the sampled action into the env
+            # action.item() is float, convert to int for discrete space
+            next_state, reward, terminated, truncated, env_info = env.step(int(action.item()))
                 
             epoch_rewards.append(reward)
             

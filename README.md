@@ -5,6 +5,7 @@
 ![NumPy](https://img.shields.io/badge/numpy-%23013243.svg?style=for-the-badge&logo=numpy&logoColor=white)
 ![Matplotlib](https://img.shields.io/badge/Matplotlib-%23ffffff.svg?style=for-the-badge&logo=Matplotlib&logoColor=black)
 ![YAML](https://img.shields.io/badge/yaml-%23ffffff.svg?style=for-the-badge&logo=yaml&logoColor=red)
+![Gymnasium](https://img.shields.io/badge/Gymnasium-%23000000.svg?style=for-the-badge&logo=gymnasium&logoColor=white)
 ![MIT License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)
 
 A high-performance, modular Deep Learning repository showcasing **Supervised Pre-training**, **Reinforcement Learning (RL) Fine-Tuning (Alignment)**, **Explainable AI (XAI)**, and **Neural Diagnostics** in PyTorch.
@@ -59,18 +60,21 @@ graph TD
 
 ### 2. Reinforcement Learning (RL) Alignment
 Instead of relying on supervised gradients, we treat the pre-trained classifier as a stochastic policy $\pi_\theta(a|\mathbf{s})$ and optimize it via policy gradients over an expanded domain of $[-15.0, 15.0]$.
+* **Gymnasium Environment**: We wrapped the training domain in a custom `CircleEnv` inheriting from `gymnasium.Env`.
 * **State Space ($\mathcal{S}$)**: $\mathbf{s} = [x_1, x_2, r] \in [-15.0, 15.0]^2 \times [0.5, 15.0]$
 * **Action Space ($\mathcal{A}$)**: Binary prediction $a \in \{0, 1\}$ (0 for OUTSIDE, 1 for INSIDE).
 * **Policy ($\pi_\theta$)**: The model's Sigmoid output probability $p$ forms a Bernoulli distribution.
-* **Reward Function ($\mathcal{R}$)**:
+* **Shaped Reward Function ($\mathcal{R}$)**:
+  Instead of static feedback, we use a continuous, distance-based penalty to help the agent learn boundary precision:
 
-$$\mathcal{R}(\mathbf{s}, a) = \begin{cases} +1.0 & \text{if prediction } a \text{ is correct} \\ -1.5 & \text{if prediction } a \text{ is incorrect (penalty)} \end{cases}$$
+$$\mathcal{R}(\mathbf{s}, a) = \begin{cases} +1.0 & \text{if prediction } a \text{ is correct} \\ -(0.5 + 0.2 \times |d - r|) & \text{if prediction } a \text{ is incorrect (shaped penalty)} \end{cases}$$
 
+  where $d = \sqrt{x_1^2 + x_2^2}$ is the distance to the origin and $r$ is the dynamic boundary radius.
 * **REINFORCE Algorithm**: We update the policy parameters using the policy gradient loss:
 
 $$\mathcal{L}_{PG}(\theta) = -\log \pi_\theta(a|\mathbf{s}) \times \mathcal{R}(\mathbf{s}, a)$$
 
-* **Warm Start & LR Alignment**: Starting from SFT weights prevents the RL agent from starting from zero-knowledge. Lowering the learning rate to $lr=0.001$ protects the pre-trained weights from collapsing (**Catastrophic Forgetting**), resulting in a stable reward convergence of **+0.978+** (where 1.0 is perfect).
+* **Warm Start & Convergence**: Starting from SFT weights prevents the RL agent from starting from zero-knowledge. Lowering the learning rate to $lr=0.001$ protects the pre-trained weights from collapsing (**Catastrophic Forgetting**), resulting in a stable reward convergence of **+0.993** (where 1.0 is perfect).
 
 
 ---
